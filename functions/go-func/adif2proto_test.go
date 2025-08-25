@@ -1,11 +1,12 @@
 package forester
 
 import (
-	adifpb "github.com/k0swe/adif-json-protobuf/go"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"reflect"
 	"testing"
 	"time"
+
+	adifpb "github.com/k0swe/adif-json-protobuf/go"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func Test_adifToProto(t *testing.T) {
@@ -15,7 +16,7 @@ func Test_adifToProto(t *testing.T) {
 		AdifVersion:      "3.1.1",
 		CreatedTimestamp: createStamp,
 		ProgramId:        "forester-func",
-		ProgramVersion:   "0.0.1",
+		ProgramVersion:   "0.0.2",
 	}
 	type args struct {
 		adifString string
@@ -203,16 +204,16 @@ func Test_adifToProto(t *testing.T) {
 		{
 			name: "LotW",
 			args: args{
-				adifString: `ARRL Logbook of the World Status Report                        
-Generated at 2020-11-02 21:31:01                            
-for k0swe                                                                                                                     
-Query:                    
-    QSL ONLY: YES                                              
+				adifString: `ARRL Logbook of the World Status Report
+Generated at 2020-11-02 21:31:01
+for k0swe
+Query:
+    QSL ONLY: YES
 QSL RX SINCE: 2020-10-31 21:08:24 (system supplied default)
-                                                                                                                              
-<PROGRAMID:4>LoTW                                              
-<APP_LoTW_LASTQSL:19>2020-10-31 21:08:24                       
-                               
+
+<PROGRAMID:4>LoTW
+<APP_LoTW_LASTQSL:19>2020-10-31 21:08:24
+
 <APP_LoTW_NUMREC:1>1
 
 <eoh>
@@ -223,12 +224,12 @@ QSL RX SINCE: 2020-10-31 21:08:24 (system supplied default)
 <MODE:3>FT8
 <APP_LoTW_MODEGROUP:4>DATA
 <QSO_DATE:8>20201025
-<APP_LoTW_RXQSO:19>2020-10-25 20:29:33 
+<APP_LoTW_RXQSO:19>2020-10-25 20:29:33
 <TIME_ON:6>201500
-<APP_LoTW_QSO_TIMESTAMP:20>2020-10-25T20:15:00Z 
+<APP_LoTW_QSO_TIMESTAMP:20>2020-10-25T20:15:00Z
 <QSL_RCVD:1>Y
 <QSLRDATE:8>20201031
-<APP_LoTW_RXQSL:19>2020-10-31 21:08:24 
+<APP_LoTW_RXQSL:19>2020-10-31 21:08:24
 <eor>
 `,
 				createTime: createTime,
