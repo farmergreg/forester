@@ -7,13 +7,12 @@ toolchain go1.25.1
 require (
 	cloud.google.com/go/firestore v1.18.0
 	cloud.google.com/go/pubsub v1.50.0
-	cloud.google.com/go/pubsub/v2 v2.0.0
 	cloud.google.com/go/secretmanager v1.15.0
 	dario.cat/mergo v1.0.2
 	firebase.google.com/go/v4 v4.18.0
 	github.com/antihax/optional v1.0.0
-	github.com/hamradiolog-net/adif-spec/v6 v6.0.0-beta.10
-	github.com/hamradiolog-net/adif/v4 v4.0.7
+	github.com/hamradiolog-net/adif/v5 v5.0.0-beta.8
+	github.com/hamradiolog-net/spec/v6 v6.0.0-beta.18
 	github.com/jinzhu/copier v0.4.0
 	github.com/k0swe/adif-json-protobuf/go v0.0.8
 	github.com/k0swe/lotw-qsl v0.4.7
@@ -34,6 +33,7 @@ require (
 	cloud.google.com/go/iam v1.5.2 // indirect
 	cloud.google.com/go/longrunning v0.6.7 // indirect
 	cloud.google.com/go/monitoring v1.24.2 // indirect
+	cloud.google.com/go/pubsub/v2 v2.0.0 // indirect
 	cloud.google.com/go/storage v1.56.1 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.29.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.53.0 // indirect

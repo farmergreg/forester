@@ -8,20 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hamradiolog-net/adif-spec/v6/adifield"
-	"github.com/hamradiolog-net/adif/v4"
+	"github.com/hamradiolog-net/adif/v5"
+	"github.com/hamradiolog-net/spec/v6/adifield"
 	adifpb "github.com/k0swe/adif-json-protobuf/go"
 )
 
 func protoToAdif(pb *adifpb.Adif) (string, error) {
 	buf := new(bytes.Buffer)
+	writer := adif.NewADIRecordWriter(buf)
 	for _, qso := range pb.Qsos {
 		record := writeQso(qso)
-		_, err := record.WriteTo(buf)
-		if err != nil {
-			return "", err
-		}
-		_, err = buf.WriteString(adif.TagEOR)
+		err := writer.Write([]adif.Record{record})
 		if err != nil {
 			return "", err
 		}
@@ -67,7 +64,7 @@ func writeTopLevel(qso *adifpb.Qso, rec adif.Record) {
 
 func writeAppDefined(qso *adifpb.Qso, rec adif.Record) {
 	for k, v := range qso.AppDefined {
-		rec[adifield.ADIField(strings.ToUpper(k))] = v
+		rec.Set(adifield.New(k), v)
 	}
 }
 
@@ -267,28 +264,28 @@ func writeString(rec adif.Record, adifField adifield.ADIField, value string) {
 	if value == "" {
 		return
 	}
-	rec[adifField] = value
+	rec.Set(adifField, value)
 }
 
 func writeBool(rec adif.Record, adifField adifield.ADIField, value bool) {
 	if !value {
 		return
 	}
-	rec[adifField] = "Y"
+	rec.Set(adifField, "Y")
 }
 
 func writeInt(rec adif.Record, adifField adifield.ADIField, value int64) {
 	if value == 0 {
 		return
 	}
-	rec[adifField] = strconv.FormatInt(value, 10)
+	rec.Set(adifField, strconv.FormatInt(value, 10))
 }
 
 func writeFloat(rec adif.Record, adifField adifield.ADIField, value float64, precision int) {
 	if value == 0 {
 		return
 	}
-	rec[adifField] = strconv.FormatFloat(value, 'g', precision, 64)
+	rec.Set(adifField, strconv.FormatFloat(value, 'g', precision, 64))
 }
 
 func writeLatLon(rec adif.Record, adifField adifield.ADIField, latLon float64, isLat bool) {
@@ -296,7 +293,7 @@ func writeLatLon(rec adif.Record, adifField adifield.ADIField, latLon float64, i
 		return
 	}
 	value := latLonToString(latLon, isLat)
-	rec[adifField] = value
+	rec.Set(adifField, value)
 }
 
 func latLonToString(latLon float64, isLat bool) string {
@@ -324,7 +321,7 @@ func writeDate(rec adif.Record, adifField adifield.ADIField, value time.Time) {
 		return
 	}
 	// YYYYMMDD
-	rec[adifField] = dateToString(value)
+	rec.Set(adifField, dateToString(value))
 }
 
 func dateToString(value time.Time) string {
@@ -336,7 +333,7 @@ func writeTime(rec adif.Record, adifField adifield.ADIField, value time.Time) {
 		return
 	}
 	// HHMMSS
-	rec[adifField] = timeToString(value)
+	rec.Set(adifField, timeToString(value))
 }
 
 func timeToString(value time.Time) string {

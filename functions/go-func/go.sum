@@ -121,10 +121,12 @@ github.com/googleapis/enterprise-certificate-proxy v0.3.6 h1:GW/XbdyBFQ8Qe+YAmFU
 github.com/googleapis/enterprise-certificate-proxy v0.3.6/go.mod h1:MkHOF77EYAE7qfSuSS9PU6g4Nt4e11cnsDUowfwewLA=
 github.com/googleapis/gax-go/v2 v2.15.0 h1:SyjDc1mGgZU5LncH8gimWo9lW1DtIfPibOG81vgd/bo=
 github.com/googleapis/gax-go/v2 v2.15.0/go.mod h1:zVVkkxAQHa1RQpg9z2AUCMnKhi0Qld9rcmyfL1OZhoc=
-github.com/hamradiolog-net/adif-spec/v6 v6.0.0-beta.10 h1:DozCtiTSqkB/OE3IXVfWIFGvY9I/UEKchiqaVt7Wti4=
-github.com/hamradiolog-net/adif-spec/v6 v6.0.0-beta.10/go.mod h1:XAAslZANuhEuLWOv08GbKI0hXEcj+huIXO5su7YWlgA=
-github.com/hamradiolog-net/adif/v4 v4.0.7 h1:qYLMYTSop945ij273B0lVSy8hacDj1ztwWcibpfieEI=
-github.com/hamradiolog-net/adif/v4 v4.0.7/go.mod h1:r+WEjhXqpaHrQY4KxNZthHL3mAEPu0xItMdjrNadYLc=
+github.com/hamradiolog-net/adif/v5 v5.0.0-beta.7 h1:tOPNf3Xtd7SCgjdiKAAkbOGXZp8N1zCK2gI6NxDD4w4=
+github.com/hamradiolog-net/adif/v5 v5.0.0-beta.7/go.mod h1:iyIWJihOTm5OfQEWkGuLr2Gjknz/FwUVXeCfdAnDj4s=
+github.com/hamradiolog-net/adif/v5 v5.0.0-beta.8 h1:OFJkBJT7Bb5yT4niM8q89CNCy7ITZWbB5AxKvK6MQJ4=
+github.com/hamradiolog-net/adif/v5 v5.0.0-beta.8/go.mod h1:iyIWJihOTm5OfQEWkGuLr2Gjknz/FwUVXeCfdAnDj4s=
+github.com/hamradiolog-net/spec/v6 v6.0.0-beta.18 h1:R4r/Me6/kNpa/s5qVGatX+P3tkHYCM82mfBkAgF2Szk=
+github.com/hamradiolog-net/spec/v6 v6.0.0-beta.18/go.mod h1:pVgHeVUKWLo733V1E6FdOHjtfVk39/TSzBL51Dcv1YY=
 github.com/jinzhu/copier v0.4.0 h1:w3ciUoD19shMCRargcpm0cm91ytaBhDvuRpz1ODO/U8=
 github.com/jinzhu/copier v0.4.0/go.mod h1:DfbEm0FYsaqBcKcFuvmOZb218JkPGtvSHsKg8S8hyyg=
 github.com/k0swe/adif-json-protobuf/go v0.0.8 h1:mwNCIg3E1Zmihxinv6+C8PjUJbTDq0tjAqAQiTt/O3s=
