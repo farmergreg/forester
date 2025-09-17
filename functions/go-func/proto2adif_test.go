@@ -1,11 +1,12 @@
 package forester
 
 import (
-	adifpb "github.com/k0swe/adif-json-protobuf/go"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"strings"
 	"testing"
 	"time"
+
+	adifpb "github.com/k0swe/adif-json-protobuf/go"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func Test_proto2Adif(t *testing.T) {
@@ -33,8 +34,14 @@ func Test_proto2Adif(t *testing.T) {
 					LoggingStation:   &adifpb.Station{StationCall: "K0SWE"},
 				},
 			}},
-			want: "<call:4>KK9A" + "<station_callsign:5>K0SWE" + "<band:3>20m" + "<freq:6>14.282" +
-				"<mode:3>SSB" + "<qso_date:8>20200329" + "<time_on:6>003400" + "<submode:3>USB" +
+			want: "<qso_date:8>20200329" +
+				"<time_on:6>003400" +
+				"<band:3>20m" +
+				"<mode:3>SSB" +
+				"<submode:3>USB" +
+				"<call:4>KK9A" +
+				"<freq:6>14.282" +
+				"<station_callsign:5>K0SWE" +
 				"<eor>",
 		},
 	}
