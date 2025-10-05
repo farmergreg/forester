@@ -15,7 +15,7 @@ func Test_adifToProto(t *testing.T) {
 		AdifVersion:      "3.1.1",
 		CreatedTimestamp: createStamp,
 		ProgramId:        "forester-func",
-		ProgramVersion:   "0.0.1",
+		ProgramVersion:   "0.0.2",
 	}
 	type args struct {
 		adifString string

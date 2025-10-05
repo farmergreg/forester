@@ -2,9 +2,6 @@ package forester
 
 import (
 	"errors"
-	"github.com/Matir/adifparser"
-	adifpb "github.com/k0swe/adif-json-protobuf/go"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"log"
 	"math"
@@ -12,32 +9,35 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/farmergreg/adif/v5"
+	"github.com/farmergreg/spec/v6/adifield"
+	adifpb "github.com/k0swe/adif-json-protobuf/go"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func adifToProto(adifString string, createTime time.Time) (*adifpb.Adif, error) {
-	reader := adifparser.NewADIFReader(strings.NewReader(adifString))
 	adi := new(adifpb.Adif)
 	created := timestamppb.New(createTime)
 	adi.Header = &adifpb.Header{
 		AdifVersion:      "3.1.1",
 		CreatedTimestamp: created,
 		ProgramId:        "forester-func",
-		ProgramVersion:   "0.0.1",
+		ProgramVersion:   "0.0.2",
 	}
-	qsos := make([]*adifpb.Qso, reader.RecordCount())
-	record, err := reader.ReadRecord()
+	reader := adif.NewADIDocumentReader(strings.NewReader(adifString), true)
+	rec, _, err := reader.Next()
 	for err == nil {
-		qsos = append(qsos, recordToQso(record))
-		record, err = reader.ReadRecord()
+		adi.Qsos = append(adi.Qsos, recordToQso(rec))
+		rec, _, err = reader.Next()
 	}
 	if !errors.Is(err, io.EOF) {
 		return nil, err
 	}
-	adi.Qsos = qsos
 	return adi, nil
 }
 
-func recordToQso(record adifparser.ADIFRecord) *adifpb.Qso {
+func recordToQso(record adif.Record) *adifpb.Qso {
 	qso := new(adifpb.Qso)
 	parseTopLevel(record, qso)
 	parseAppDefined(record, qso)
@@ -51,31 +51,31 @@ func recordToQso(record adifparser.ADIFRecord) *adifpb.Qso {
 	return qso
 }
 
-func parseTopLevel(record adifparser.ADIFRecord, qso *adifpb.Qso) {
-	qso.Band, _ = record.GetValue("band")
-	qso.BandRx, _ = record.GetValue("band_rx")
-	qso.Comment, _ = record.GetValue("comment")
-	qso.DistanceKm = getUint32(record, "distance")
-	qso.Freq = getFloat64(record, "freq")
-	qso.FreqRx = getFloat64(record, "freq_rx")
-	qso.Mode, _ = record.GetValue("mode")
-	qso.Notes, _ = record.GetValue("notes")
-	qso.PublicKey, _ = record.GetValue("public_key")
-	qso.Complete, _ = record.GetValue("qso_complete")
-	qso.TimeOn = getTimestamp(record, "qso_date", "time_on")
-	qso.TimeOff = getTimestamp(record, "qso_date_off", "time_off")
-	qso.Random = getBool(record, "qso_random")
-	qso.RstReceived, _ = record.GetValue("rst_rcvd")
-	qso.RstSent, _ = record.GetValue("rst_sent")
-	qso.Submode, _ = record.GetValue("submode")
-	qso.Swl = getBool(record, "swl")
+func parseTopLevel(record adif.Record, qso *adifpb.Qso) {
+	qso.Band = record.Get(adifield.BAND)
+	qso.BandRx = record.Get(adifield.BAND_RX)
+	qso.Comment = record.Get(adifield.COMMENT)
+	qso.DistanceKm = getUint32(record.Get(adifield.DISTANCE))
+	qso.Freq = getFloat64(record.Get(adifield.FREQ))
+	qso.FreqRx = getFloat64(record.Get(adifield.FREQ_RX))
+	qso.Mode = record.Get(adifield.MODE)
+	qso.Notes = record.Get(adifield.NOTES)
+	qso.PublicKey = record.Get(adifield.PUBLIC_KEY)
+	qso.Complete = record.Get(adifield.QSO_COMPLETE)
+	qso.TimeOn = getTimestamp(record.Get(adifield.QSO_DATE), record.Get(adifield.TIME_ON))
+	qso.TimeOff = getTimestamp(record.Get(adifield.QSO_DATE_OFF), record.Get(adifield.TIME_OFF))
+	qso.Random = getBool(record.Get(adifield.QSO_RANDOM))
+	qso.RstReceived = record.Get(adifield.RST_RCVD)
+	qso.RstSent = record.Get(adifield.RST_SENT)
+	qso.Submode = record.Get(adifield.SUBMODE)
+	qso.Swl = getBool(record.Get(adifield.SWL))
 }
 
-func parseAppDefined(record adifparser.ADIFRecord, qso *adifpb.Qso) {
+func parseAppDefined(record adif.Record, qso *adifpb.Qso) {
 	appDefined := map[string]string{}
-	for _, field := range record.GetFields() {
-		if strings.HasPrefix(field, "app_") {
-			appDefined[field], _ = record.GetValue(field)
+	for field, value := range record.Fields() {
+		if strings.HasPrefix(string(field), adifield.APP_) {
+			appDefined[strings.ToLower(string(field))] = value // TODO converting to lower for compatibility. could this be left upper?
 		}
 	}
 	if len(appDefined) > 0 {
@@ -83,134 +83,132 @@ func parseAppDefined(record adifparser.ADIFRecord, qso *adifpb.Qso) {
 	}
 }
 
-func parseContactedStation(record adifparser.ADIFRecord, qso *adifpb.Qso) {
+func parseContactedStation(record adif.Record, qso *adifpb.Qso) {
 	qso.ContactedStation = new(adifpb.Station)
-	qso.ContactedStation.Address, _ = record.GetValue("address")
-	qso.ContactedStation.Age = getUint32(record, "age")
-	qso.ContactedStation.StationCall, _ = record.GetValue("call")
-	qso.ContactedStation.County, _ = record.GetValue("cnty")
-	qso.ContactedStation.Continent, _ = record.GetValue("cont")
-	qso.ContactedStation.OpCall, _ = record.GetValue("contacted_op")
-	qso.ContactedStation.Country, _ = record.GetValue("country")
-	qso.ContactedStation.CqZone = getUint32(record, "cqz")
-	qso.ContactedStation.DarcDok, _ = record.GetValue("darc_dok")
-	qso.ContactedStation.Dxcc = getUint32(record, "dxcc")
-	qso.ContactedStation.Email, _ = record.GetValue("email")
-	qso.ContactedStation.OwnerCall, _ = record.GetValue("eq_call")
-	qso.ContactedStation.Fists = getUint32(record, "fists")
-	qso.ContactedStation.FistsCc = getUint32(record, "fists_cc")
-	qso.ContactedStation.GridSquare, _ = record.GetValue("gridsquare")
-	qso.ContactedStation.Iota, _ = record.GetValue("iota")
-	qso.ContactedStation.IotaIslandId = getUint32(record, "iota_island_id")
-	qso.ContactedStation.ItuZone = getUint32(record, "ituz")
-	qso.ContactedStation.Latitude = getLatLon(record, "lat")
-	qso.ContactedStation.Longitude = getLatLon(record, "lon")
-	qso.ContactedStation.OpName, _ = record.GetValue("name")
-	qso.ContactedStation.Pfx, _ = record.GetValue("pfx")
-	qso.ContactedStation.QslVia, _ = record.GetValue("qsl_via")
-	qso.ContactedStation.City, _ = record.GetValue("qth")
-	qso.ContactedStation.Region, _ = record.GetValue("region")
-	qso.ContactedStation.Rig, _ = record.GetValue("rig")
-	qso.ContactedStation.Power = getFloat64(record, "rx_pwr")
-	qso.ContactedStation.Sig, _ = record.GetValue("sig")
-	qso.ContactedStation.SigInfo, _ = record.GetValue("sig_info")
-	qso.ContactedStation.SilentKey = getBool(record, "silent_key")
-	qso.ContactedStation.Skcc, _ = record.GetValue("skcc")
-	qso.ContactedStation.SotaRef, _ = record.GetValue("sota_ref")
-	qso.ContactedStation.State, _ = record.GetValue("state")
-	qso.ContactedStation.TenTen = getUint32(record, "ten_ten")
-	qso.ContactedStation.Uksmg = getUint32(record, "uksmg")
-	qso.ContactedStation.UsacaCounties, _ = record.GetValue("usaca_counties")
-	qso.ContactedStation.VuccGrids, _ = record.GetValue("vucc_grids")
-	qso.ContactedStation.Web, _ = record.GetValue("web")
+	qso.ContactedStation.Address = record.Get(adifield.ADDRESS)
+	qso.ContactedStation.Age = getUint32(record.Get(adifield.AGE))
+	qso.ContactedStation.StationCall = record.Get(adifield.CALL)
+	qso.ContactedStation.County = record.Get(adifield.CNTY)
+	qso.ContactedStation.Continent = record.Get(adifield.CONT)
+	qso.ContactedStation.OpCall = record.Get(adifield.CONTACTED_OP)
+	qso.ContactedStation.Country = record.Get(adifield.COUNTRY)
+	qso.ContactedStation.CqZone = getUint32(record.Get(adifield.CQZ))
+	qso.ContactedStation.DarcDok = record.Get(adifield.DARC_DOK)
+	qso.ContactedStation.Dxcc = getUint32(record.Get(adifield.DXCC))
+	qso.ContactedStation.Email = record.Get(adifield.EMAIL)
+	qso.ContactedStation.OwnerCall = record.Get(adifield.EQ_CALL)
+	qso.ContactedStation.Fists = getUint32(record.Get(adifield.FISTS))
+	qso.ContactedStation.FistsCc = getUint32(record.Get(adifield.FISTS_CC))
+	qso.ContactedStation.GridSquare = record.Get(adifield.GRIDSQUARE)
+	qso.ContactedStation.Iota = record.Get(adifield.IOTA)
+	qso.ContactedStation.IotaIslandId = getUint32(record.Get(adifield.IOTA_ISLAND_ID))
+	qso.ContactedStation.ItuZone = getUint32(record.Get(adifield.ITUZ))
+	qso.ContactedStation.Latitude = getLatLon(record.Get(adifield.LAT))
+	qso.ContactedStation.Longitude = getLatLon(record.Get(adifield.LON))
+	qso.ContactedStation.OpName = record.Get(adifield.NAME)
+	qso.ContactedStation.Pfx = record.Get(adifield.PFX)
+	qso.ContactedStation.QslVia = record.Get(adifield.QSL_VIA)
+	qso.ContactedStation.City = record.Get(adifield.QTH)
+	qso.ContactedStation.Region = record.Get(adifield.REGION)
+	qso.ContactedStation.Rig = record.Get(adifield.RIG)
+	qso.ContactedStation.Power = getFloat64(record.Get(adifield.RX_PWR))
+	qso.ContactedStation.Sig = record.Get(adifield.SIG)
+	qso.ContactedStation.SigInfo = record.Get(adifield.SIG_INFO)
+	qso.ContactedStation.SilentKey = getBool(record.Get(adifield.SILENT_KEY))
+	qso.ContactedStation.Skcc = record.Get(adifield.SKCC)
+	qso.ContactedStation.SotaRef = record.Get(adifield.SOTA_REF)
+	qso.ContactedStation.State = record.Get(adifield.STATE)
+	qso.ContactedStation.TenTen = getUint32(record.Get(adifield.TEN_TEN))
+	qso.ContactedStation.Uksmg = getUint32(record.Get(adifield.UKSMG))
+	qso.ContactedStation.UsacaCounties = record.Get(adifield.USACA_COUNTIES)
+	qso.ContactedStation.VuccGrids = record.Get(adifield.VUCC_GRIDS)
+	qso.ContactedStation.Web = record.Get(adifield.WEB)
 }
 
-func parseLoggingStation(record adifparser.ADIFRecord, qso *adifpb.Qso) {
+func parseLoggingStation(record adif.Record, qso *adifpb.Qso) {
 	qso.LoggingStation = new(adifpb.Station)
-	qso.LoggingStation.AntennaAzimuth = getInt32(record, "ant_az")
-	qso.LoggingStation.AntennaElevation = getInt32(record, "ant_el")
-	qso.LoggingStation.Antenna, _ = record.GetValue("my_antenna")
-	qso.LoggingStation.City, _ = record.GetValue("my_city")
-	qso.LoggingStation.County, _ = record.GetValue("my_cnty")
-	qso.LoggingStation.Country, _ = record.GetValue("my_country")
-	qso.LoggingStation.CqZone = getUint32(record, "my_cq_zone")
-	qso.LoggingStation.Dxcc = getUint32(record, "my_dxcc")
-	qso.LoggingStation.Fists = getUint32(record, "my_fists")
-	qso.LoggingStation.GridSquare, _ = record.GetValue("my_gridsquare")
-	qso.LoggingStation.Iota, _ = record.GetValue("my_iota")
-	qso.LoggingStation.IotaIslandId = getUint32(record, "my_iota_island_id")
-	qso.LoggingStation.ItuZone = getUint32(record, "my_itu_zone")
-	qso.LoggingStation.Latitude = getLatLon(record, "my_lat")
-	qso.LoggingStation.Longitude = getLatLon(record, "my_lon")
-	qso.LoggingStation.OpName, _ = record.GetValue("my_name")
-	qso.LoggingStation.PostalCode, _ = record.GetValue("my_postal_code")
-	qso.LoggingStation.Rig, _ = record.GetValue("my_rig")
-	qso.LoggingStation.Sig, _ = record.GetValue("my_sig")
-	qso.LoggingStation.SigInfo, _ = record.GetValue("my_sig_info")
-	qso.LoggingStation.SotaRef, _ = record.GetValue("my_sota_ref")
-	qso.LoggingStation.State, _ = record.GetValue("my_state")
-	qso.LoggingStation.Street, _ = record.GetValue("my_street")
-	qso.LoggingStation.UsacaCounties, _ = record.GetValue("my_usaca_counties")
-	qso.LoggingStation.VuccGrids, _ = record.GetValue("my_vucc_grids")
-	qso.LoggingStation.OpCall, _ = record.GetValue("operator")
-	qso.LoggingStation.OwnerCall, _ = record.GetValue("owner_callsign")
-	qso.LoggingStation.StationCall, _ = record.GetValue("station_callsign")
-	qso.LoggingStation.Power = getFloat64(record, "tx_pwr")
+	qso.LoggingStation.AntennaAzimuth = getInt32(record.Get(adifield.ANT_AZ))
+	qso.LoggingStation.AntennaElevation = getInt32(record.Get(adifield.ANT_EL))
+	qso.LoggingStation.Antenna = record.Get(adifield.MY_ANTENNA)
+	qso.LoggingStation.City = record.Get(adifield.MY_CITY)
+	qso.LoggingStation.County = record.Get(adifield.MY_CNTY)
+	qso.LoggingStation.Country = record.Get(adifield.MY_COUNTRY)
+	qso.LoggingStation.CqZone = getUint32(record.Get(adifield.MY_CQ_ZONE))
+	qso.LoggingStation.Dxcc = getUint32(record.Get(adifield.MY_DXCC))
+	qso.LoggingStation.Fists = getUint32(record.Get(adifield.MY_FISTS))
+	qso.LoggingStation.GridSquare = record.Get(adifield.MY_GRIDSQUARE)
+	qso.LoggingStation.Iota = record.Get(adifield.MY_IOTA)
+	qso.LoggingStation.IotaIslandId = getUint32(record.Get(adifield.MY_IOTA_ISLAND_ID))
+	qso.LoggingStation.ItuZone = getUint32(record.Get(adifield.MY_ITU_ZONE))
+	qso.LoggingStation.Latitude = getLatLon(record.Get(adifield.MY_LAT))
+	qso.LoggingStation.Longitude = getLatLon(record.Get(adifield.MY_LON))
+	qso.LoggingStation.OpName = record.Get(adifield.MY_NAME)
+	qso.LoggingStation.PostalCode = record.Get(adifield.MY_POSTAL_CODE)
+	qso.LoggingStation.Rig = record.Get(adifield.MY_RIG)
+	qso.LoggingStation.Sig = record.Get(adifield.MY_SIG)
+	qso.LoggingStation.SigInfo = record.Get(adifield.MY_SIG_INFO)
+	qso.LoggingStation.SotaRef = record.Get(adifield.MY_SOTA_REF)
+	qso.LoggingStation.State = record.Get(adifield.MY_STATE)
+	qso.LoggingStation.Street = record.Get(adifield.MY_STREET)
+	qso.LoggingStation.UsacaCounties = record.Get(adifield.MY_USACA_COUNTIES)
+	qso.LoggingStation.VuccGrids = record.Get(adifield.MY_VUCC_GRIDS)
+	qso.LoggingStation.OpCall = record.Get(adifield.OPERATOR)
+	qso.LoggingStation.OwnerCall = record.Get(adifield.OWNER_CALLSIGN)
+	qso.LoggingStation.StationCall = record.Get(adifield.STATION_CALLSIGN)
+	qso.LoggingStation.Power = getFloat64(record.Get(adifield.TX_PWR))
 }
 
-func parseContest(record adifparser.ADIFRecord, qso *adifpb.Qso) {
-	contestID, _ := record.GetValue("contest_id")
+func parseContest(record adif.Record, qso *adifpb.Qso) {
+	contestID := record.Get(adifield.CONTEST_ID)
 	if contestID != "" {
 		qso.Contest = new(adifpb.ContestData)
 		qso.Contest.ContestId = contestID
-		qso.Contest.ArrlSection, _ = record.GetValue("arrl_sect")
-		qso.Contest.StationClass, _ = record.GetValue("class")
-		qso.Contest.Check, _ = record.GetValue("check")
-		qso.Contest.Precedence, _ = record.GetValue("precedence")
-		qso.Contest.SerialReceived, _ = record.GetValue("srx")
+		qso.Contest.ArrlSection = record.Get(adifield.ARRL_SECT)
+		qso.Contest.StationClass = record.Get(adifield.CLASS)
+		qso.Contest.Check = record.Get(adifield.CHECK)
+		qso.Contest.Precedence = record.Get(adifield.PRECEDENCE)
+		qso.Contest.SerialReceived = record.Get(adifield.SRX)
 		if qso.Contest.SerialReceived == "" {
-			qso.Contest.SerialReceived, _ = record.GetValue("srx_string")
+			qso.Contest.SerialReceived = record.Get(adifield.SRX_STRING)
 		}
-		qso.Contest.SerialSent, _ = record.GetValue("stx")
+		qso.Contest.SerialSent = record.Get(adifield.STX)
 		if qso.Contest.SerialSent == "" {
-			qso.Contest.SerialSent, _ = record.GetValue("stx_string")
+			qso.Contest.SerialSent = record.Get(adifield.STX_STRING)
 		}
 	}
 }
 
-func parsePropagation(record adifparser.ADIFRecord, qso *adifpb.Qso) {
+func parsePropagation(record adif.Record, qso *adifpb.Qso) {
 	qso.Propagation = new(adifpb.Propagation)
-	qso.Propagation.AIndex = getUint32(record, "a_index")
-	qso.Propagation.AntPath, _ = record.GetValue("ant_path")
-	qso.Propagation.ForceInit = getBool(record, "force_init")
-	qso.Propagation.KIndex = getUint32(record, "k_index")
-	qso.Propagation.MaxBursts = getUint32(record, "max_bursts")
-	qso.Propagation.MeteorShowerName, _ = record.GetValue("ms_shower")
-	qso.Propagation.NrBursts = getUint32(record, "nr_bursts")
-	qso.Propagation.NrPings = getUint32(record, "nr_pings")
-	qso.Propagation.PropagationMode, _ = record.GetValue("prop_mode")
-	qso.Propagation.SatMode, _ = record.GetValue("sat_mode")
-	qso.Propagation.SatName, _ = record.GetValue("sat_name")
-	qso.Propagation.SolarFluxIndex = getUint32(record, "sfi")
+	qso.Propagation.AIndex = getUint32(record.Get(adifield.A_INDEX))
+	qso.Propagation.AntPath = record.Get(adifield.ANT_PATH)
+	qso.Propagation.ForceInit = getBool(record.Get(adifield.FORCE_INIT))
+	qso.Propagation.KIndex = getUint32(record.Get(adifield.K_INDEX))
+	qso.Propagation.MaxBursts = getUint32(record.Get(adifield.MAX_BURSTS))
+	qso.Propagation.MeteorShowerName = record.Get(adifield.MS_SHOWER)
+	qso.Propagation.NrBursts = getUint32(record.Get(adifield.NR_BURSTS))
+	qso.Propagation.NrPings = getUint32(record.Get(adifield.NR_PINGS))
+	qso.Propagation.PropagationMode = record.Get(adifield.PROP_MODE)
+	qso.Propagation.SatMode = record.Get(adifield.SAT_MODE)
+	qso.Propagation.SatName = record.Get(adifield.SAT_NAME)
+	qso.Propagation.SolarFluxIndex = getUint32(record.Get(adifield.SFI))
 }
 
-func parseAwardsAndCredit(record adifparser.ADIFRecord, qso *adifpb.Qso) {
-	qso.AwardSubmitted = parseAwards(record, "award_submitted")
-	qso.AwardGranted = parseAwards(record, "award_granted")
-	qso.CreditSubmitted = parseCredit(record, "credit_submitted")
-	qso.CreditGranted = parseCredit(record, "credit_granted")
+func parseAwardsAndCredit(record adif.Record, qso *adifpb.Qso) {
+	qso.AwardSubmitted = parseAwards(record.Get(adifield.AWARD_SUBMITTED))
+	qso.AwardGranted = parseAwards(record.Get(adifield.AWARD_GRANTED))
+	qso.CreditSubmitted = parseCredit(record.Get(adifield.CREDIT_SUBMITTED))
+	qso.CreditGranted = parseCredit(record.Get(adifield.CREDIT_GRANTED))
 }
 
-func parseAwards(record adifparser.ADIFRecord, adifField string) []string {
-	awardString, _ := record.GetValue(adifField)
+func parseAwards(awardString string) []string {
 	if awardString == "" {
 		return nil
 	}
 	return strings.Split(awardString, ",")
 }
 
-func parseCredit(record adifparser.ADIFRecord, adifField string) []*adifpb.Credit {
-	creditString, _ := record.GetValue(adifField)
+func parseCredit(creditString string) []*adifpb.Credit {
 	if creditString == "" {
 		return nil
 	}
@@ -228,26 +226,26 @@ func parseCredit(record adifparser.ADIFRecord, adifField string) []*adifpb.Credi
 	return ret
 }
 
-func parseUploads(record adifparser.ADIFRecord, qso *adifpb.Qso) {
-	qrzStatus, _ := record.GetValue("qrzcom_qso_upload_status")
+func parseUploads(record adif.Record, qso *adifpb.Qso) {
+	qrzStatus := record.Get(adifield.QRZCOM_QSO_UPLOAD_STATUS)
 	if qrzStatus != "" {
 		qso.Qrzcom = new(adifpb.Upload)
 		qso.Qrzcom.UploadStatus = translateUploadStatus(qrzStatus)
-		qso.Qrzcom.UploadDate = getDate(record, "qrzcom_qso_upload_date")
+		qso.Qrzcom.UploadDate = getDate(record.Get(adifield.QRZCOM_QSO_UPLOAD_DATE))
 	}
 
-	hrdStatus, _ := record.GetValue("hrdlog_qso_upload_status")
+	hrdStatus := record.Get(adifield.HRDLOG_QSO_UPLOAD_STATUS)
 	if hrdStatus != "" {
 		qso.Hrdlog = new(adifpb.Upload)
 		qso.Hrdlog.UploadStatus = translateUploadStatus(hrdStatus)
-		qso.Hrdlog.UploadDate = getDate(record, "hrdlog_qso_upload_date")
+		qso.Hrdlog.UploadDate = getDate(record.Get(adifield.HRDLOG_QSO_UPLOAD_DATE))
 	}
 
-	clublogStatus, _ := record.GetValue("clublog_qso_upload_status")
+	clublogStatus := record.Get(adifield.CLUBLOG_QSO_UPLOAD_STATUS)
 	if clublogStatus != "" {
 		qso.Clublog = new(adifpb.Upload)
 		qso.Clublog.UploadStatus = translateUploadStatus(clublogStatus)
-		qso.Clublog.UploadDate = getDate(record, "clublog_qso_upload_date")
+		qso.Clublog.UploadDate = getDate(record.Get(adifield.CLUBLOG_QSO_UPLOAD_DATE))
 	}
 }
 
@@ -264,26 +262,25 @@ func translateUploadStatus(status string) adifpb.UploadStatus {
 	}
 }
 
-func parseQsls(record adifparser.ADIFRecord, qso *adifpb.Qso) {
+func parseQsls(record adif.Record, qso *adifpb.Qso) {
 	qso.Card = parseCardQsl(record)
-	qso.Eqsl = parseQsl(record, "eqsl_")
-	qso.Lotw = parseQsl(record, "lotw_")
+
+	qso.Eqsl = parseQsl(record.Get(adifield.EQSL_QSL_SENT), record.Get(adifield.EQSL_QSL_RCVD), record.Get(adifield.EQSL_QSLRDATE), record.Get(adifield.EQSL_QSLSDATE))
+	qso.Eqsl = parseQsl(record.Get(adifield.LOTW_QSL_SENT), record.Get(adifield.LOTW_QSL_RCVD), record.Get(adifield.LOTW_QSLRDATE), record.Get(adifield.LOTW_QSLSDATE))
 }
 
-func parseCardQsl(record adifparser.ADIFRecord) *adifpb.Qsl {
-	card := parseQsl(record, "")
+func parseCardQsl(record adif.Record) *adifpb.Qsl {
+	card := parseQsl(record.Get(adifield.QSL_SENT), record.Get(adifield.QSL_RCVD), record.Get(adifield.QSLRDATE), record.Get(adifield.QSLSDATE))
 	if card == nil {
 		return nil
 	}
-	card.SentVia, _ = record.GetValue("qsl_sent_via")
-	card.ReceivedVia, _ = record.GetValue("qsl_rcvd_via")
-	card.ReceivedMessage, _ = record.GetValue("qslmsg")
+	card.SentVia = record.Get(adifield.QSL_SENT_VIA)
+	card.ReceivedVia = record.Get(adifield.QSL_RCVD_VIA)
+	card.ReceivedMessage = record.Get(adifield.QSLMSG)
 	return card
 }
 
-func parseQsl(record adifparser.ADIFRecord, prefix string) *adifpb.Qsl {
-	sent, _ := record.GetValue(prefix + "qsl_sent")
-	received, _ := record.GetValue(prefix + "qsl_rcvd")
+func parseQsl(sent, received, receivedDate, sentDate string) *adifpb.Qsl {
 	var noQsl = (sent == "" || sent == "N") &&
 		(received == "" || received == "N")
 	if noQsl {
@@ -291,15 +288,14 @@ func parseQsl(record adifparser.ADIFRecord, prefix string) *adifpb.Qsl {
 	}
 	qsl := new(adifpb.Qsl)
 	qsl.SentStatus = sent
-	qsl.ReceivedDate = getDate(record, prefix+"qslrdate")
+	qsl.ReceivedDate = getDate(receivedDate)
 	qsl.ReceivedStatus = received
-	qsl.SentDate = getDate(record, prefix+"qslsdate")
+	qsl.SentDate = getDate(sentDate)
 
 	return qsl
 }
 
-func getLatLon(record adifparser.ADIFRecord, field string) float64 {
-	st, _ := record.GetValue(field)
+func getLatLon(st string) float64 {
 	if st == "" {
 		return 0
 	}
@@ -317,35 +313,29 @@ func getLatLon(record adifparser.ADIFRecord, field string) float64 {
 	return retval
 }
 
-func getBool(record adifparser.ADIFRecord, field string) bool {
-	st, _ := record.GetValue(field)
+func getBool(st string) bool {
 	return st == "Y"
 }
 
-func getFloat64(record adifparser.ADIFRecord, field string) float64 {
-	st, _ := record.GetValue(field)
+func getFloat64(st string) float64 {
 	fl, _ := strconv.ParseFloat(st, 64)
 	return fl
 }
 
-func getUint32(record adifparser.ADIFRecord, field string) uint32 {
-	s, _ := record.GetValue(field)
+func getUint32(s string) uint32 {
 	i64, _ := strconv.ParseUint(s, 10, 32)
 	return uint32(i64)
 }
 
-func getInt32(record adifparser.ADIFRecord, field string) int32 {
-	s, _ := record.GetValue(field)
+func getInt32(s string) int32 {
 	i64, _ := strconv.ParseInt(s, 10, 32)
 	return int32(i64)
 }
 
-func getTimestamp(record adifparser.ADIFRecord, dateField string, timeField string) *timestamppb.Timestamp {
-	dateStr, _ := record.GetValue(dateField)
+func getTimestamp(dateStr string, timeStr string) *timestamppb.Timestamp {
 	if dateStr == "" {
 		return nil
 	}
-	timeStr, _ := record.GetValue(timeField)
 	if len(timeStr) == 4 {
 		timeStr += "00"
 	}
@@ -356,8 +346,7 @@ func getTimestamp(record adifparser.ADIFRecord, dateField string, timeField stri
 	return timestamppb.New(t)
 }
 
-func getDate(record adifparser.ADIFRecord, field string) *timestamppb.Timestamp {
-	dateStr, _ := record.GetValue(field)
+func getDate(dateStr string) *timestamppb.Timestamp {
 	if dateStr == "" {
 		return nil
 	}

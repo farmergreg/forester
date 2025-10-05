@@ -1,6 +1,6 @@
 module github.com/k0swe/forester-func
 
-go 1.24.0
+go 1.25
 
 toolchain go1.25.1
 
@@ -10,8 +10,9 @@ require (
 	cloud.google.com/go/secretmanager v1.15.0
 	dario.cat/mergo v1.0.2
 	firebase.google.com/go/v4 v4.18.0
-	github.com/Matir/adifparser v0.0.0-20230124172935-2c465737f437
 	github.com/antihax/optional v1.0.0
+	github.com/farmergreg/adif/v5 v5.0.0-beta.24
+	github.com/farmergreg/spec/v6 v6.0.0-beta.33
 	github.com/jinzhu/copier v0.4.0
 	github.com/k0swe/adif-json-protobuf/go v0.0.8
 	github.com/k0swe/lotw-qsl v0.4.8
